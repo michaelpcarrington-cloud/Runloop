@@ -152,6 +152,38 @@
   .pace-calc .v.good { color: var(--green); }
   .pace-calc .v.over { color: var(--amber); }
 
+  /* THURSDAY QUALITY SESSION */
+  .qsesh {
+    margin-top: 14px; padding: 12px 13px; border-radius: 12px;
+    background: var(--bg); border: 1px solid var(--line);
+    display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .qsesh.tempo { border-left: 3px solid var(--amber); }
+  .qsesh.intervals { border-left: 3px solid #ff4d6d; }
+  .qsesh.easy { border-left: 3px solid var(--muted); }
+  .qsesh.qdone { background: var(--green-soft); border-color: rgba(54,211,153,0.35); }
+  .qcheck {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line);
+    flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .qsesh.qdone .qcheck { background: var(--green); border-color: var(--green); }
+  .qcheck svg { opacity: 0; transition: opacity .2s; }
+  .qsesh.qdone .qcheck svg { opacity: 1; }
+  .qbody { flex: 1; min-width: 0; }
+  .qtop { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .qday { font-family: 'Spline Sans Mono', monospace; font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: 0.08em; }
+  .qname { font-size: 14px; font-weight: 800; }
+  .qpace { font-family: 'Spline Sans Mono', monospace; font-size: 12px; color: var(--amber); font-weight: 600; margin-left: auto; }
+  .qsesh.intervals .qpace { color: #ff6b85; }
+  .qsesh.easy .qpace { color: var(--muted); }
+  .qdesc { font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
+  .long-head {
+    font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 700; margin-top: 16px;
+  }
+
   /* TIPS */
   .tips { margin: 22px 20px 0; padding: 18px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; }
   .tips h3 { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-family: 'Spline Sans Mono', monospace; margin-bottom: 12px; }
@@ -203,7 +235,7 @@
   <div class="row is-rest"><div class="day">MON</div><div class="act">Rest</div><div class="tag rest">rest</div></div>
   <div class="row"><div class="day">TUE</div><div class="act">PT circuit · 5:30am</div><div class="tag pt">PT</div></div>
   <div class="row is-rest"><div class="day">WED</div><div class="act">Rest</div><div class="tag rest">rest</div></div>
-  <div class="row"><div class="day">THU</div><div class="act">Lunch run · 30–40 min</div><div class="tag q">quality</div></div>
+  <div class="row"><div class="day">THU</div><div class="act">Lunch run · tempo / intervals</div><div class="tag q">quality</div></div>
   <div class="row is-rest"><div class="day">FRI</div><div class="act">Rest</div><div class="tag rest">rest</div></div>
   <div class="row"><div class="day">SAT</div><div class="act">Long run</div><div class="tag long">long</div></div>
   <div class="row is-rest"><div class="day">SUN</div><div class="act">Rest</div><div class="tag rest">rest</div></div>
@@ -253,7 +285,38 @@ const PLAN = [
 ];
 const TOTAL = PLAN.length;
 
-let state = {};   // {idx: {done, dist, time, pace}}
+// Thursday quality session, alternating tempo / intervals.
+// Step-back & taper weeks get an easy session instead (recovery).
+const SESSIONS = {
+  tempo: {
+    name: "Tempo",
+    cls: "tempo",
+    pace: "6:00–6:20 /km",
+    desc: "10 min easy warm-up · 15–20 min at tempo (comfortably hard, short phrases only) · 5 min easy."
+  },
+  intervals: {
+    name: "Intervals",
+    cls: "intervals",
+    pace: "5:30–5:50 /km",
+    desc: "Warm-up · 5–6 × 2 min hard / 90 sec easy jog between · cool-down."
+  },
+  easy: {
+    name: "Easy",
+    cls: "easy",
+    pace: "7:00–7:20 /km",
+    desc: "Relaxed 30–35 min, conversational. Recovery week — keep it genuinely easy."
+  }
+};
+
+function sessionFor(i){
+  const w = PLAN[i];
+  // Recovery-flavoured weeks run easy on Thursday too
+  if (w.tag === 'step' || w.tag === 'taper' || w.tag === 'race') return SESSIONS.easy;
+  // Alternate tempo / intervals across the build weeks
+  return (i % 2 === 0) ? SESSIONS.tempo : SESSIONS.intervals;
+}
+
+let state = {};   // {idx: {done, qdone, dist, time, feel}}
 let openIdx = null;
 
 async function load() {
@@ -292,6 +355,7 @@ function render() {
     const st = state[i] || {};
     const isRace = w.tag === 'race';
     const isNext = i === firstUndone && !isRace;
+    const ses = sessionFor(i);
     const div = document.createElement('div');
     div.className = 'wk' + (st.done?' done':'') + (openIdx===i?' open':'') + (isNext?' next':'') + (isRace?' race':'');
 
@@ -326,13 +390,23 @@ function render() {
       </div>
       <div class="log">
         <div class="log-inner">
+          <div class="qsesh ${ses.cls} ${st.qdone?'qdone':''}" onclick="markQ(${i})">
+            <div class="qcheck">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#1a0f02" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="qbody">
+              <div class="qtop"><span class="qday">THU</span><span class="qname">${ses.name}</span><span class="qpace">${ses.pace}</span></div>
+              <div class="qdesc">${ses.desc}</div>
+            </div>
+          </div>
+          <div class="long-head">SAT · Long run — log it</div>
           <div class="log-grid">
             <div class="fld"><label>Distance</label><input inputmode="decimal" placeholder="${fmtDist(w.dist)}" value="${st.dist||''}" oninput="field(${i},'dist',this.value)"></div>
             <div class="fld"><label>Time</label><input inputmode="text" placeholder="mm:ss" value="${st.time||''}" oninput="field(${i},'time',this.value)"></div>
             <div class="fld"><label>Feel /10</label><input inputmode="numeric" placeholder="—" value="${st.feel||''}" oninput="field(${i},'feel',this.value)"></div>
           </div>
           ${paceBlock}
-          <div class="log-note">Tap the circle to mark the week <b>complete</b>. Log distance &amp; time off your watch — pace fills in automatically. Keep long runs at <b>6:45–7:15/km</b>.</div>
+          <div class="log-note">Tap the <b>Thursday card</b> to mark the quality run done, the <b>circle</b> to complete the week. Log Saturday's distance &amp; time — pace fills in. Keep long runs at <b>6:45–7:15/km</b>.</div>
         </div>
       </div>`;
     wrap.appendChild(div);
@@ -362,6 +436,14 @@ function mark(i){
   state[i] = state[i] || {};
   state[i].done = !state[i].done;
   save(); render();
+}
+function markQ(i){
+  state[i] = state[i] || {};
+  state[i].qdone = !state[i].qdone;
+  save();
+  const open = openIdx;
+  render();
+  openIdx = open;
 }
 function field(i,key,val){
   state[i] = state[i] || {};
